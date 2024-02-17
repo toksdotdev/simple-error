@@ -17,31 +17,44 @@ use std::fmt::Display;
 use simple_error_derive::SimpleError;
 
 #[derive(Debug, SimpleError)]
-enum SomeError {
-    #[error("hello unit")]
+enum SomeError<'a> {
+    #[error("Unit error")]
     Unit,
-    #[error("hello {0:?} {1}")]
-    Unnamed(UnnamedStructValue, i32),
-    #[error("hello {message}")]
+
+    #[error("Unnamed error: {0:?}, {1}, 0x{2:0x}")]
+    Unnamed(State, &'a str, i32),
+
+    #[error("Named error: {message}")]
     Named { message: String },
 }
 
 #[derive(Debug)]
-struct UnnamedStructValue {
-    value: i32,
+struct State {
+    code: i32,
 }
 
-assert_eq!(SomeError::Unit.to_string(), "hello unit");
+fn unnamed_error() -> Result<(), SomeError<'static>> {
+    Err(SomeError::Unnamed(
+        State { code: 2 },
+        "state error",
+        32
+    ))
+}
+
+fn named_error() -> Result<(), SomeError<'static>> {
+    Err(SomeError::Named {
+        message: "critical error".to_string(),
+    })
+}
+
+assert_eq!(SomeError::Unit.to_string(), "Unit error");
 assert_eq!(
-    SomeError::Named {
-        message: "world".to_string(),
-    }
-    .to_string(),
-    "hello world"
+    unnamed_error().unwrap_err().to_string(),
+    "Unnamed error: State { code: 2 }, state error, 0x20"
 );
 assert_eq!(
-    SomeError::Unnamed(UnnamedStructValue { value: 42 }, 45).to_string(),
-    "hello UnnamedStructValue { value: 42 } 45"
+    named_error().unwrap_err().to_string(),
+    "Named error: critical error"
 );
 ```
 */
@@ -89,14 +102,17 @@ fn impl_display_error(input: &DeriveInput) -> syn::Result<TokenStream> {
         })
         .collect::<Result<Vec<_>, _>>()?;
 
+    let (impl_generics, ty_generics, where_clause) = &input.generics.split_for_impl();
     let impls = quote! {
-        impl std::fmt::Display for #enum_name {
+        impl #impl_generics std::fmt::Display for #enum_name #ty_generics #where_clause {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 match self {
                     #(#match_arms)*
                 }
             }
         }
+
+        impl #impl_generics std::error::Error for #enum_name #ty_generics #where_clause {}
     };
 
     Ok(impls)
