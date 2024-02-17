@@ -13,40 +13,30 @@ This repo contains the following crates:
 
 ```rust
 #[derive(Debug, SimpleError)]
-    enum SomeError {
-        #[error("hello unit")]
-        Unit,
-        #[error("hello {0} {1}")]
-        Unnamed(UnnamedStructValue, i32),
-        #[error("hello {message}")]
-        Named { message: String },
-    }
-
-    #[derive(Debug)]
-    struct UnnamedStructValue {
-        value: i32,
-    }
-
-    impl Display for UnnamedStructValue {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}", self.value)
-        }
-    }
-
-    #[test]
-    fn test_display_error() {
-        assert_eq!(SomeError::Unit.to_string(), "hello unit");
-        assert_eq!(
-            SomeError::Named {
-                message: "world".to_string(),
-            }
-            .to_string(),
-            "hello world"
-        );
-        assert_eq!(
-            SomeError::Unnamed(UnnamedStructValue { value: 42 }, 45).to_string(),
-            "hello 42 45"
-        );
-    }
+enum SomeError {
+    #[error("hello unit")]
+    Unit,
+    #[error("hello {0:?} {1}")]
+    Unnamed(UnnamedStructValue, i32),
+    #[error("hello {message}")]
+    Named { message: String },
 }
+
+#[derive(Debug)]
+struct UnnamedStructValue {
+    value: i32,
+}
+
+assert_eq!(SomeError::Unit.to_string(), "hello unit");
+assert_eq!(
+    SomeError::Named {
+        message: "world".to_string(),
+    }
+    .to_string(),
+    "hello world"
+);
+assert_eq!(
+    SomeError::Unnamed(UnnamedStructValue { value: 42 }, 45).to_string(),
+    "hello 42 45"
+);
 ```

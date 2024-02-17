@@ -20,7 +20,7 @@ use simple_error_derive::SimpleError;
     enum SomeError {
         #[error("hello unit")]
         Unit,
-        #[error("hello {0} {1}")]
+        #[error("hello {0:?} {1}")]
         Unnamed(UnnamedStructValue, i32),
         #[error("hello {message}")]
         Named { message: String },
@@ -29,12 +29,6 @@ use simple_error_derive::SimpleError;
     #[derive(Debug)]
     struct UnnamedStructValue {
         value: i32,
-    }
-
-    impl Display for UnnamedStructValue {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}", self.value)
-        }
     }
 
     #[test]
