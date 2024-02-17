@@ -30,6 +30,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "simple-error-derive"
+version = "0.0.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "simple-error",
+ "syn",
+]
+
+[[package]]
 name = "syn"
 version = "2.0.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"

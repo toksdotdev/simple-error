@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 #[cfg(feature = "display")]
 use proc_macro2::Ident;
@@ -27,8 +27,11 @@ pub struct Interpolate<'a> {
     ///   specified, it is used instead of an auto-incremented index.
     pub text: String,
 
-    /// Field names used in the interpolated text.
-    pub used_fields: BTreeSet<String>,
+    /// Identifiers used in the interpolated text.
+    ///
+    /// We also keep any traits that are used in the interpolated text. Basically, anything that
+    /// after the `:` in the interpolated text. If there's trait specified, the trait value is `None`.
+    pub used_identifiers: BTreeMap<String, Option<String>>,
 }
 
 impl Interpolate<'_> {
@@ -36,22 +39,21 @@ impl Interpolate<'_> {
     /// Returns a tuple of the fields and the format string with the interpolated fields replaced with
     /// the __ prefix (and for positional values, __0, __1, etc.)
     pub fn parse<'a>(fmt_text: &'a str, variant: &'a Variant) -> Interpolate<'a> {
-        let (text, used_fields) = parse_internal(fmt_text);
+        let (text, used_identifiers) = parse_internal(fmt_text);
 
         Interpolate {
             variant,
             text,
-            used_fields,
+            used_identifiers,
         }
     }
 }
 
-/// Parse the format text and extract the fields to be interpolated.
-fn parse_internal(fmt_text: &str) -> (String, BTreeSet<String>) {
-    let mut fields = BTreeSet::new();
+/// Parse the format text and extract the identifiers to be interpolated.
+fn parse_internal(fmt_text: &str) -> (String, BTreeMap<String, Option<String>>) {
+    let mut used_identifiers = BTreeMap::new();
     let mut fmt_string = String::new();
     let mut chars = fmt_text.chars().peekable();
-
     let mut index_for_unnamed = -1;
 
     while let Some(c) = chars.next() {
@@ -68,6 +70,7 @@ fn parse_internal(fmt_text: &str) -> (String, BTreeSet<String>) {
         }
 
         let mut field = "".to_string();
+        let mut traits = None;
         while let Some(c) = chars.next() {
             if c == ':' {
                 // If no field name was parsed bfore the ':', then it's a positional value;
@@ -81,7 +84,16 @@ fn parse_internal(fmt_text: &str) -> (String, BTreeSet<String>) {
                     field = format!("__{}", field);
                 }
 
-                field.push(c);
+                // Collect everything after the ':' as the trait name until we find the closing '}'.
+                while let Some(c) = chars.peek() {
+                    if *c == '}' {
+                        break;
+                    }
+
+                    traits.get_or_insert("".to_string()).push(*c);
+                    chars.next();
+                }
+
                 continue;
             }
 
@@ -96,8 +108,13 @@ fn parse_internal(fmt_text: &str) -> (String, BTreeSet<String>) {
                     field = format!("__{}", field);
                 }
 
-                fields.insert(field.clone());
-                fmt_string.push_str(&format!("{{{}}}", &field));
+                fmt_string.push_str(&format!(
+                    "{{{}{}}}",
+                    &field,
+                    traits.as_ref().map(|c| format!(":{c}")).unwrap_or_default()
+                ));
+
+                used_identifiers.insert(field.clone(), traits);
                 break;
             }
 
@@ -105,7 +122,7 @@ fn parse_internal(fmt_text: &str) -> (String, BTreeSet<String>) {
         }
     }
 
-    (fmt_string, fields)
+    (fmt_string, used_identifiers)
 }
 
 #[cfg(feature = "display")]
@@ -126,13 +143,13 @@ impl quote::ToTokens for Interpolate<'_> {
                     field
                         .ident
                         .as_ref()
-                        .and_then(|ident| build_ident_assignment(ident, &self.used_fields))
+                        .and_then(|ident| build_ident_assignment(ident, &self.used_identifiers))
                 });
 
                 let fields_ident = self
-                    .used_fields
+                    .used_identifiers
                     .iter()
-                    .map(|ident| Ident::new(ident, proc_macro2::Span::call_site()));
+                    .map(|(ident, _)| Ident::new(ident, proc_macro2::Span::call_site()));
 
                 quote! {
                     Self::#variant_name(#(#fields_ident,)* ..) => write!(f, #interpolated_text, #(#assignments),*),
@@ -156,12 +173,12 @@ impl quote::ToTokens for Interpolate<'_> {
 /// Build the assignment for the field if it is used in the format string.
 fn build_ident_assignment(
     ident: &Ident,
-    used_fields: &BTreeSet<String>,
+    used_fields: &BTreeMap<String, Option<String>>,
 ) -> Option<proc_macro2::TokenStream> {
     use quote::format_ident;
 
     // If the field is not present in the format string, then we don't need to interpolate it
-    if !used_fields.contains(&ident.to_string()) {
+    if !used_fields.contains_key(&ident.to_string()) {
         return None;
     }
 
@@ -171,29 +188,29 @@ fn build_ident_assignment(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::collections::BTreeMap;
 
     use crate::parse_internal;
 
-    fn to_set<T: ToString>(values: &[T]) -> BTreeSet<String> {
+    fn to_map<T: ToString>(values: &[(T, Option<T>)]) -> BTreeMap<String, Option<String>> {
         values
             .iter()
-            .map(|s| s.to_string())
-            .collect::<BTreeSet<String>>()
+            .map(|(a, b)| (a.to_string(), b.as_ref().map(|s| s.to_string())))
+            .collect()
     }
 
     #[test]
     fn test_parse_fmt_string() {
         assert_eq!(
             parse_internal("Hello, {name}!"),
-            ("Hello, {name}!".to_string(), to_set(&["name"]),)
+            ("Hello, {name}!".to_string(), to_map(&[("name", None)]),)
         );
 
         assert_eq!(
             parse_internal("Hello, {name}! {age}"),
             (
                 "Hello, {name}! {age}".to_string(),
-                to_set(&["name".to_string(), "age".to_string()]),
+                to_map(&[("name", None), ("age", None)]),
             )
         );
 
@@ -201,7 +218,7 @@ mod tests {
             parse_internal("Hello, {0}! {1}"),
             (
                 "Hello, {__0}! {__1}".to_string(),
-                to_set(&["__0".to_string(), "__1".to_string()]),
+                to_map(&[("__0", None), ("__1", None)]),
             )
         );
 
@@ -209,7 +226,7 @@ mod tests {
             parse_internal("Hello, {}! {}"),
             (
                 "Hello, {__0}! {__1}".to_string(),
-                to_set(&["__0".to_string(), "__1".to_string()]),
+                to_map(&[("__0", None), ("__1", None)]),
             )
         );
 
@@ -217,14 +234,14 @@ mod tests {
             parse_internal("Hello, {}! {} {name} {0} {} {1} {1}"),
             (
                 "Hello, {__0}! {__1} {name} {__0} {__2} {__1} {__1}".to_string(),
-                to_set(&[
-                    "__0".to_string(),
-                    "__1".to_string(),
-                    "name".to_string(),
-                    "__0".to_string(),
-                    "__2".to_string(),
-                    "__1".to_string(),
-                    "__1".to_string()
+                to_map(&[
+                    ("__0", None),
+                    ("__1", None),
+                    ("name", None),
+                    ("__0", None),
+                    ("__2", None),
+                    ("__1", None),
+                    ("__1", None),
                 ]),
             )
         );
@@ -256,12 +273,40 @@ mod tests {
             {__11:X} {__12:#X} {__1:X} {__1:#X} \
             {__13}{__14} {name:?}{__15:b}Hello{__16}"
                     .to_string(),
-                to_set(&[
-                    "__0:?", "__1:#?", "name:?", "name:#?", "__2:b", "__0:b", "__0:#b", "__3:e",
-                    "__1:e", "__4:x", "__1:x", "__1:#x", "__5:o", "__6:#o", "__1:o", "__1:#o",
-                    "__7:p", "__8:#p", "__1:p", "__1:#p", "__9:#E", "__1:#E", "__10:x", "__1:x",
-                    "__11:X", "__12:#X", "__1:X", "__1:#X", "__13", "__14", "name:?", "__15:b",
-                    "__16",
+                to_map(&[
+                    ("__0", Some("?")),
+                    ("__1", Some("#?")),
+                    ("name", Some("?")),
+                    ("name", Some("#?")),
+                    ("__2", Some("b")),
+                    ("__0", Some("b")),
+                    ("__0", Some("#b")),
+                    ("__3", Some("e")),
+                    ("__1", Some("e")),
+                    ("__4", Some("x")),
+                    ("__1", Some("x")),
+                    ("__1", Some("#x")),
+                    ("__5", Some("o")),
+                    ("__6", Some("#o")),
+                    ("__1", Some("o")),
+                    ("__1", Some("#o")),
+                    ("__7", Some("p")),
+                    ("__8", Some("#p")),
+                    ("__1", Some("p")),
+                    ("__1", Some("#p")),
+                    ("__9", Some("#E")),
+                    ("__1", Some("#E")),
+                    ("__10", Some("x")),
+                    ("__1", Some("x")),
+                    ("__11", Some("X")),
+                    ("__12", Some("#X")),
+                    ("__1", Some("X")),
+                    ("__1", Some("#X")),
+                    ("__13", None),
+                    ("__14", None),
+                    ("name", Some("?")),
+                    ("__15", Some("b")),
+                    ("__16", None),
                 ])
             )
         );

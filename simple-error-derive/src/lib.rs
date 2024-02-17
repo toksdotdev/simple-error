@@ -31,21 +31,19 @@ use simple_error_derive::SimpleError;
         value: i32,
     }
 
-    #[test]
-    fn test_display_error() {
-        assert_eq!(SomeError::Unit.to_string(), "hello unit");
-        assert_eq!(
-            SomeError::Named {
-                message: "world".to_string(),
-            }
-            .to_string(),
-            "hello world"
-        );
-        assert_eq!(
-            SomeError::Unnamed(UnnamedStructValue { value: 42 }, 45).to_string(),
-            "hello 42 45"
-        );
-    }
+    assert_eq!(SomeError::Unit.to_string(), "hello unit");
+    assert_eq!(
+        SomeError::Named {
+            message: "world".to_string(),
+        }
+        .to_string(),
+        "hello world"
+    );
+    assert_eq!(
+        SomeError::Unnamed(UnnamedStructValue { value: 42 }, 45).to_string(),
+        "hello UnnamedStructValue { value: 42 } 45"
+    );
+
 ```
 */
 #[proc_macro_derive(SimpleError, attributes(error))]

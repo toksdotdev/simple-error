@@ -37,6 +37,6 @@ assert_eq!(
 );
 assert_eq!(
     SomeError::Unnamed(UnnamedStructValue { value: 42 }, 45).to_string(),
-    "hello 42 45"
+    "hello UnnamedStructValue { value: 42 } 45"
 );
 ```
