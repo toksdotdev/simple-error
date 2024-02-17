@@ -38,7 +38,7 @@ impl Interpolate<'_> {
     /// Parse the format text and extract the fields to be interpolated.
     /// Returns a tuple of the fields and the format string with the interpolated fields replaced with
     /// the __ prefix (and for positional values, __0, __1, etc.)
-    pub fn parse<'a>(fmt_text: &'a str, variant: &'a Variant) -> Interpolate<'a> {
+    pub fn parse<'a>(fmt_text: impl AsRef<str>, variant: &'a Variant) -> Interpolate<'a> {
         let (text, used_identifiers) = parse_internal(fmt_text);
 
         Interpolate {
@@ -50,10 +50,10 @@ impl Interpolate<'_> {
 }
 
 /// Parse the format text and extract the identifiers to be interpolated.
-fn parse_internal(fmt_text: &str) -> (String, BTreeMap<String, Option<String>>) {
+fn parse_internal(fmt_text: impl AsRef<str>) -> (String, BTreeMap<String, Option<String>>) {
     let mut used_identifiers = BTreeMap::new();
     let mut fmt_string = String::new();
-    let mut chars = fmt_text.chars().peekable();
+    let mut chars = fmt_text.as_ref().chars().peekable();
     let mut index_for_unnamed = -1;
 
     while let Some(c) = chars.next() {
