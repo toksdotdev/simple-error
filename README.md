@@ -11,8 +11,6 @@ This repo contains the following crates:
 
 ### Usage
 
-This crate provides a simple error type that can be used to create errors with a message and a source error.
-
 ```rust
 #[derive(Debug, SimpleError)]
     enum SomeError {
