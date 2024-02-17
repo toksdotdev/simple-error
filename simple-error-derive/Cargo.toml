@@ -1,0 +1,15 @@
+[package]
+name = "simple-error-derive"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+simple-error = { path = "../simple-error", version = "*", features = [
+    "display",
+] }
+syn = "2.0"
+quote = "1.0"
+proc-macro2 = "1.0"
