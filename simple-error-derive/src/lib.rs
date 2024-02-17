@@ -17,33 +17,32 @@ use std::fmt::Display;
 use simple_error_derive::SimpleError;
 
 #[derive(Debug, SimpleError)]
-    enum SomeError {
-        #[error("hello unit")]
-        Unit,
-        #[error("hello {0:?} {1}")]
-        Unnamed(UnnamedStructValue, i32),
-        #[error("hello {message}")]
-        Named { message: String },
+enum SomeError {
+    #[error("hello unit")]
+    Unit,
+    #[error("hello {0:?} {1}")]
+    Unnamed(UnnamedStructValue, i32),
+    #[error("hello {message}")]
+    Named { message: String },
+}
+
+#[derive(Debug)]
+struct UnnamedStructValue {
+    value: i32,
+}
+
+assert_eq!(SomeError::Unit.to_string(), "hello unit");
+assert_eq!(
+    SomeError::Named {
+        message: "world".to_string(),
     }
-
-    #[derive(Debug)]
-    struct UnnamedStructValue {
-        value: i32,
-    }
-
-    assert_eq!(SomeError::Unit.to_string(), "hello unit");
-    assert_eq!(
-        SomeError::Named {
-            message: "world".to_string(),
-        }
-        .to_string(),
-        "hello world"
-    );
-    assert_eq!(
-        SomeError::Unnamed(UnnamedStructValue { value: 42 }, 45).to_string(),
-        "hello UnnamedStructValue { value: 42 } 45"
-    );
-
+    .to_string(),
+    "hello world"
+);
+assert_eq!(
+    SomeError::Unnamed(UnnamedStructValue { value: 42 }, 45).to_string(),
+    "hello UnnamedStructValue { value: 42 } 45"
+);
 ```
 */
 #[proc_macro_derive(SimpleError, attributes(error))]
