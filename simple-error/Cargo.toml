@@ -1,0 +1,13 @@
+[package]
+name = "simple-error"
+version = "0.0.1"
+edition = "2021"
+
+[features]
+default = []
+display = []
+
+[dependencies]
+syn = "2.0"
+quote = "1.0"
+proc-macro2 = "1.0"
