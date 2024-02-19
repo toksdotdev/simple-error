@@ -46,22 +46,20 @@ impl Interpolate<'_> {
     }
 }
 
-/// Parse the format text and extract the identifiers to be interpolated.
-fn parse_internal(fmt_text: impl AsRef<str>) -> (String, BTreeSet<String>) {
-    let mut identifers = BTreeSet::new();
-    let mut fmt_string = String::new();
-    let mut chars = fmt_text.as_ref().chars().peekable();
-    let mut index_for_unnamed = -1;
+/// Parse the text and extract the identifiers to be interpolated.
+fn parse_internal(text: impl AsRef<str>) -> (String, BTreeSet<String>) {
+    let mut chars = text.as_ref().chars().peekable();
+    let (mut identifers, mut text, mut positional_index) = (BTreeSet::new(), String::new(), -1);
 
     while let Some(c) = chars.next() {
         if c != '{' {
-            fmt_string.push(c);
+            text.push(c);
             continue;
         }
 
         // If the next character is also a '{', then it's an escaped '{'
         if let Some('{') = chars.peek() {
-            fmt_string.push_str("{{");
+            text.push_str("{{");
             chars.next();
             continue;
         }
@@ -72,8 +70,8 @@ fn parse_internal(fmt_text: impl AsRef<str>) -> (String, BTreeSet<String>) {
                 // If no field name was parsed bfore the ':', then it's a positional value;
                 // so we need to add the index to the field name
                 if identifier.is_empty() {
-                    index_for_unnamed += 1;
-                    identifier.push_str(&format!("__{}", index_for_unnamed));
+                    positional_index += 1;
+                    identifier.push_str(&format!("__{}", positional_index));
                 }
 
                 if identifier.parse::<usize>().is_ok() {
@@ -96,8 +94,8 @@ fn parse_internal(fmt_text: impl AsRef<str>) -> (String, BTreeSet<String>) {
             if c == '}' {
                 // If no field name was parsed, then it's a positional value
                 if identifier.is_empty() {
-                    index_for_unnamed += 1;
-                    identifier.push_str(&format!("__{}", index_for_unnamed));
+                    positional_index += 1;
+                    identifier.push_str(&format!("__{}", positional_index));
                 }
 
                 if identifier.parse::<u8>().is_ok() {
@@ -105,7 +103,7 @@ fn parse_internal(fmt_text: impl AsRef<str>) -> (String, BTreeSet<String>) {
                 }
 
                 let traits = traits.as_ref().map(|c| format!(":{c}")).unwrap_or_default();
-                fmt_string.push_str(&format!("{{{}{}}}", &identifier, traits));
+                text.push_str(&format!("{{{}{}}}", &identifier, traits));
                 identifers.insert(identifier.clone());
                 break;
             }
@@ -114,7 +112,7 @@ fn parse_internal(fmt_text: impl AsRef<str>) -> (String, BTreeSet<String>) {
         }
     }
 
-    (fmt_string, identifers)
+    (text, identifers)
 }
 
 #[cfg(feature = "display")]
