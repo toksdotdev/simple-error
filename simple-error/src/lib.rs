@@ -33,15 +33,15 @@ pub struct Interpolate<'a> {
 
 impl Interpolate<'_> {
     /// Parse the format text and extract the fields to be interpolated.
-    /// Returns a tuple of the fields and the format string with the interpolated fields replaced with
-    /// the __ prefix (and for positional values, __0, __1, etc.)
+    /// Returns a tuple of the fields and the format string with the interpolated
+    /// fields replaced with the __ prefix (and for positional values, __0, __1, etc.)
     pub fn parse<'a>(fmt_text: impl AsRef<str>, variant: &'a Variant) -> Interpolate<'a> {
-        let (text, used_identifiers) = parse_internal(fmt_text);
+        let (text, identifiers) = parse_internal(fmt_text);
 
         Interpolate {
             variant,
             text,
-            identifiers: used_identifiers,
+            identifiers,
         }
     }
 }
