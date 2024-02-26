@@ -25,7 +25,7 @@ pub struct Interpolate<'a> {
     /// - For positional values, `{[0-9]*}`, it is replaced with `__0`, `__1`, etc, where
     ///   the number is the index of the interpolated value. If the index is manually
     ///   specified, it is used instead of an auto-incremented index.
-    pub text: String,
+    pub rewritten_text: String,
 
     /// Identifiers used in the interpolated text.
     pub identifiers: BTreeSet<String>,
@@ -36,11 +36,11 @@ impl Interpolate<'_> {
     /// Returns a tuple of the fields and the format string with the interpolated
     /// fields replaced with the __ prefix (and for positional values, __0, __1, etc.)
     pub fn parse<'a>(fmt_text: impl AsRef<str>, variant: &'a Variant) -> Interpolate<'a> {
-        let (text, identifiers) = parse_internal(fmt_text);
+        let (rewritten_text, identifiers) = parse_internal(fmt_text);
 
         Interpolate {
             variant,
-            text,
+            rewritten_text,
             identifiers,
         }
     }
@@ -67,17 +67,6 @@ fn parse_internal(text: impl AsRef<str>) -> (String, BTreeSet<String>) {
         let (mut identifier, mut traits) = ("".to_string(), None);
         while let Some(c) = chars.next() {
             if c == ':' {
-                // If no field name was parsed bfore the ':', then it's a positional value;
-                // so we need to add the index to the field name
-                if identifier.is_empty() {
-                    positional_index += 1;
-                    identifier.push_str(&format!("__{}", positional_index));
-                }
-
-                if identifier.parse::<usize>().is_ok() {
-                    identifier = format!("__{}", identifier);
-                }
-
                 // Collect everything after the ':' as the trait name until we find the closing '}'.
                 while let Some(c) = chars.peek() {
                     if *c == '}' {
@@ -92,7 +81,8 @@ fn parse_internal(text: impl AsRef<str>) -> (String, BTreeSet<String>) {
             }
 
             if c == '}' {
-                // If no field name was parsed, then it's a positional value
+                // If no field name was parsed bfore the ':', then it's a positional value;
+                // so we need to add the index to the field name
                 if identifier.is_empty() {
                     positional_index += 1;
                     identifier.push_str(&format!("__{}", positional_index));
@@ -119,7 +109,7 @@ fn parse_internal(text: impl AsRef<str>) -> (String, BTreeSet<String>) {
 impl quote::ToTokens for Interpolate<'_> {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let variant_name = &self.variant.ident;
-        let interpolated_text = &self.text;
+        let interpolated_text = &self.rewritten_text;
 
         let mappings = match &self.variant.fields {
             syn::Fields::Unit => {
